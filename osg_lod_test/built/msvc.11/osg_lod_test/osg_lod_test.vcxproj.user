@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LocalDebuggerCommandArguments>-o E:\Dev\GitHub\osg_lod_test\osg_lod_test\data\out\output.osg -dir E:\Dev\GitHub\osg_lod_test\osg_lod_test\data\in</LocalDebuggerCommandArguments>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerEnvironment>PATH=E:\Misc\pre_compile_lib\osg\OpenSceneGraph-3.2.1\install\bin;E:\Misc\pre_compile_lib\osg\3rdParty_VS2012.3_v110_x86_x64_V8b_full\3rdParty_x86_x64\x64\bin;%PATH% $(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LocalDebuggerCommandArguments>-o E:\Dev\GitHub\osg_lod_test\osg_lod_test\data\out\output.osg -dir E:\Dev\GitHub\osg_lod_test\osg_lod_test\data\in</LocalDebuggerCommandArguments>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerEnvironment>PATH=E:\Misc\pre_compile_lib\osg\OpenSceneGraph-3.2.1\install\bin;E:\Misc\pre_compile_lib\osg\3rdParty_VS2012.3_v110_x86_x64_V8b_full\3rdParty_x86_x64\x64\bin;%PATH% $(LocalDebuggerEnvironment)</LocalDebuggerEnvironment>
+  </PropertyGroup>
+</Project>
