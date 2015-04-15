@@ -273,6 +273,9 @@ int proxy_main_pagedlod_test( int argc, char **argv )
 	return 0;
 }
 
+int textured_mesh_segmentation();
+
+int convert_to_pagedlod();
 
 int proxy_main_custom_test(int argc, char ** argv)
 {
@@ -306,6 +309,7 @@ int proxy_main_custom_test(int argc, char ** argv)
 		return 1;
 	}
 
+
 	std::string dir_name("");
 	while (arguments.read("-dir",dir_name)) {}
 	if (dir_name.empty())
@@ -323,11 +327,22 @@ int proxy_main_custom_test(int argc, char ** argv)
 	osg::ref_ptr<osg::PagedLOD> lod = new osg::PagedLOD;
 	lod->addChild(osgDB::readNodeFile(level1_name), 15.f, FLT_MAX);
 	//lod->addChild(osgDB::readNodeFile(level2_name), 0., 15.f);
-	lod->setFileName(1,level2_name);
-	lod->setRange(1, 0, 15.);
-	
 
-	osgDB::writeNodeFile(*lod,outputfile);
+
+ 	std::string level2_paged_name( osgDB::getNameLessExtension(level2_name) + ".ive" );
+	osg::ref_ptr<osg::PagedLOD> lod_2 = new osg::PagedLOD;
+	lod_2->addChild(osgDB::readNodeFile(level2_name), 0, FLT_MAX);
+	if (!osgDB::writeNodeFile(*lod_2, level2_paged_name))
+		std::cout<<level2_paged_name<<" write failed.."<<std::endl;
+	std::string rel_path = osgDB::getPathRelative(outputfile, level2_paged_name);	
+  	lod->setFileName(1,/*level2_paged_name*/rel_path);
+  	lod->setRange(1, 0, 15.);
+
+	
+	
+	lod->setCenter(lod->getBound().center());
+	if (!osgDB::writeNodeFile(*lod,outputfile))
+		std::cout<<outputfile<<" write failed.."<<std::endl;
 
 	return 0;
 }
