@@ -15,6 +15,7 @@
 #include <osgDB/ReadFile>
 #include <osgDB/WriteFile>
 #include <osgDB/FileNameUtils>
+#include <osgDB/FileUtils>
 
 #include <osgUtil/Optimizer>
 
@@ -287,7 +288,7 @@ int proxy_main_custom_test(int argc, char ** argv)
 	arguments.getApplicationUsage()->setDescription(arguments.getApplicationName()+" blablablabla.");
 	arguments.getApplicationUsage()->setCommandLineUsage(arguments.getApplicationName()+" [options] -dir directory ...");
 	arguments.getApplicationUsage()->addCommandLineOption("-h or --help","Display this information");
-	arguments.getApplicationUsage()->addCommandLineOption("-o","set the output file (defaults to output.ive)");
+	arguments.getApplicationUsage()->addCommandLineOption("-o","set the output directory");
 	arguments.getApplicationUsage()->addCommandLineOption("-dir","set the input directory");
 
 	if (arguments.read("-h") || arguments.read("--help"))
@@ -296,8 +297,27 @@ int proxy_main_custom_test(int argc, char ** argv)
 		return 1;
 	}
 
-	std::string outputfile("output.ive");
-	while (arguments.read("-o",outputfile)) {}
+	std::string output_ext(".osg");
+	std::string lod_filename = "out" + output_ext;
+	std::string out_dir("");
+	std::string dir_name("");
+
+	std::string level1_name;
+	std::string level2_name;
+
+	while (arguments.read("-o",out_dir)) {}
+	if (!osgDB::makeDirectory(out_dir))
+	{
+		osg::notify(osg::NOTICE)<<"failed to create output directory."<<std::endl;
+		return 1;
+	}
+	
+	while (arguments.read("-dir",dir_name)) {}
+	if (dir_name.empty())
+	{
+		osg::notify(osg::NOTICE)<<"no input directory."<<std::endl;
+		return 1;
+	}
 	
 	// any option left unread are converted into errors to write out later.
 	arguments.reportRemainingOptionsAsUnrecognized();
@@ -308,41 +328,41 @@ int proxy_main_custom_test(int argc, char ** argv)
 		arguments.writeErrorMessages(std::cout);
 		return 1;
 	}
+		
 
+	lod_filename = out_dir + "\\" + lod_filename;
+	level1_name = dir_name + "\\l1.ply";
+	level2_name = dir_name + "\\l2.ply";
 
-	std::string dir_name("");
-	while (arguments.read("-dir",dir_name)) {}
-	if (dir_name.empty())
+	std::string level_lod_dir = out_dir + "\\ive";
+	if (!osgDB::makeDirectory(level_lod_dir))
 	{
-		osg::notify(osg::NOTICE)<<"no input directory."<<std::endl;
+		osg::notify(osg::NOTICE)<<"failed to create ive directory."<<std::endl;
 		return 1;
 	}
-		
-	std::string basename( osgDB::getNameLessExtension(outputfile) );
-	std::string ext = '.'+ osgDB::getFileExtension(outputfile);
+	
 
-	std::string level1_name = dir_name + "\\l1.ply";
-	std::string level2_name = dir_name + "\\l2.ply";
-
+	// 读取第一层
 	osg::ref_ptr<osg::PagedLOD> lod = new osg::PagedLOD;
 	lod->addChild(osgDB::readNodeFile(level1_name), 15.f, FLT_MAX);
 	//lod->addChild(osgDB::readNodeFile(level2_name), 0., 15.f);
 
 
- 	std::string level2_paged_name( osgDB::getNameLessExtension(level2_name) + ".ive" );
+	// 把次层写成pagedlod格式并加入第一层
+ 	std::string level2_paged_name( level_lod_dir + "\\level2" + output_ext );
 	osg::ref_ptr<osg::PagedLOD> lod_2 = new osg::PagedLOD;
 	lod_2->addChild(osgDB::readNodeFile(level2_name), 0, FLT_MAX);
 	if (!osgDB::writeNodeFile(*lod_2, level2_paged_name))
 		std::cout<<level2_paged_name<<" write failed.."<<std::endl;
-	std::string rel_path = osgDB::getPathRelative(outputfile, level2_paged_name);	
+	std::string rel_path = osgDB::getPathRelative(out_dir, level2_paged_name);	
   	lod->setFileName(1,/*level2_paged_name*/rel_path);
   	lod->setRange(1, 0, 15.);
 
 	
-	
+	// 写下lod
 	lod->setCenter(lod->getBound().center());
-	if (!osgDB::writeNodeFile(*lod,outputfile))
-		std::cout<<outputfile<<" write failed.."<<std::endl;
+	if (!osgDB::writeNodeFile(*lod,lod_filename))
+		std::cout<<out_dir<<" write failed.."<<std::endl;
 
 	return 0;
 }
