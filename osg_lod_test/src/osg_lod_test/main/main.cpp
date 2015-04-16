@@ -274,9 +274,75 @@ int proxy_main_pagedlod_test( int argc, char **argv )
 	return 0;
 }
 
-int textured_mesh_segmentation();
+inline bool sphere_contained(const osg::BoundingSphere & main_sphere,
+							 const osg::BoundingSphere & test_sphere)
+{
+	double max_dist_bt_centers = main_sphere.radius() - test_sphere.radius();
+	if (max_dist_bt_centers >= 0 &&
+		(main_sphere.center() - test_sphere.center()).length() <= max_dist_bt_centers)
+		return true;
+	else 
+		return false;
+}
 
-int convert_to_pagedlod();
+int textured_mesh_segmentation()
+{
+	int ret = -1;
+
+	do 
+	{
+
+		ret = 0;
+	} while (0);
+error0:
+
+	return ret;
+}
+
+int convert_to_pagedlod(std::string obj_filename, std::string ive_filename)
+{
+	int ret = -1;
+
+	do 
+	{
+		osg::ref_ptr<osg::PagedLOD> paged_lod = new osg::PagedLOD;
+		paged_lod->addChild(osgDB::readNodeFile(obj_filename), 0, FLT_MAX);
+		if (!osgDB::writeNodeFile(*paged_lod, ive_filename))
+		{
+			std::cout<< "PagedLOD " << ive_filename<<" write failed.."<<std::endl;
+			break;
+		}
+
+		ret = 0;
+	} while (0);
+error0:
+
+	return ret;
+}
+
+int process_config_file(const std::string & config_filename,
+						const std::string & out_dir,
+						const std::string & output_ext)
+{
+	int ret = -1;
+
+	do 
+	{
+		std::string lod_filename = out_dir + "\\out" + output_ext;
+
+		std::string top_level_filename;
+		std::vector<std::string> level_directories;
+
+		// 读取config文件
+
+		// 每个阶层处理
+
+		ret = 0;
+	} while (0);
+error0:
+
+	return ret;
+}
 
 int proxy_main_custom_test(int argc, char ** argv)
 {
@@ -290,6 +356,7 @@ int proxy_main_custom_test(int argc, char ** argv)
 	arguments.getApplicationUsage()->addCommandLineOption("-h or --help","Display this information");
 	arguments.getApplicationUsage()->addCommandLineOption("-o","set the output directory");
 	arguments.getApplicationUsage()->addCommandLineOption("-dir","set the input directory");
+	arguments.getApplicationUsage()->addCommandLineOption("-config","set the config file.");
 
 	if (arguments.read("-h") || arguments.read("--help"))
 	{
@@ -297,10 +364,12 @@ int proxy_main_custom_test(int argc, char ** argv)
 		return 1;
 	}
 
+
 	std::string output_ext(".osg");
 	std::string lod_filename = "out" + output_ext;
 	std::string out_dir("");
 	std::string dir_name("");
+	std::string config_file("");
 
 	std::string level1_name;
 	std::string level2_name;
@@ -318,51 +387,73 @@ int proxy_main_custom_test(int argc, char ** argv)
 		osg::notify(osg::NOTICE)<<"no input directory."<<std::endl;
 		return 1;
 	}
-	
-	// any option left unread are converted into errors to write out later.
-	arguments.reportRemainingOptionsAsUnrecognized();
 
-	// report any errors if they have occurred when parsing the program arguments.
-	if (arguments.errors())
+	while (arguments.read("-config",config_file)) {}
+	if (!config_file.empty())
 	{
-		arguments.writeErrorMessages(std::cout);
-		return 1;
+		if (process_config_file(config_file, out_dir, output_ext))
+		{
+			std::cout<<"process confif file failed."<<std::endl;
+			return 1;
+		}
+	} else {
+		// tt
+		osgDB::DirectoryContents dir_contents = osgDB::getDirectoryContents(dir_name);
+		for (int i = 0; i < dir_contents.size(); ++i)
+		{
+			std::cout<<osgDB::fileType(dir_name + "\\"+dir_contents[i])<<std::endl;
+		}
+
+		// any option left unread are converted into errors to write out later.
+		arguments.reportRemainingOptionsAsUnrecognized();
+
+		// report any errors if they have occurred when parsing the program arguments.
+		if (arguments.errors())
+		{
+			arguments.writeErrorMessages(std::cout);
+			return 1;
+		}
+
+
+		lod_filename = out_dir + "\\" + lod_filename;
+		level1_name = dir_name + "\\l1.ive";
+		level2_name = dir_name + "\\test.obj";
+		float zoom_boundary = 8.; 
+
+		std::string level_lod_dir = out_dir + "\\ive";
+		if (!osgDB::makeDirectory(level_lod_dir))
+		{
+			osg::notify(osg::NOTICE)<<"failed to create ive directory."<<std::endl;
+			return 1;
+		}
+
+
+		// 读取第一层
+		osg::ref_ptr<osg::PagedLOD> lod = new osg::PagedLOD;
+		lod->addChild(osgDB::readNodeFile(level1_name), 0, FLT_MAX);
+		//std::cout<<lod->getBound().radius()<<std::endl;
+		//lod->addChild(osgDB::readNodeFile(level2_name), 0., 15.f);
+
+
+		// 把次层写成pagedlod格式并加入第一层
+		std::string level2_paged_name( level_lod_dir + "\\level2" + output_ext );
+		osg::ref_ptr<osg::PagedLOD> lod_2 = new osg::PagedLOD;
+		lod_2->addChild(osgDB::readNodeFile(level2_name), 0, FLT_MAX);
+		if (!osgDB::writeNodeFile(*lod_2, level2_paged_name))
+			std::cout<<level2_paged_name<<" write failed.."<<std::endl;
+		float radius = lod->getBound().radius();
+		std::cout<<radius<<std::endl;
+		std::string rel_path = osgDB::getPathRelative(out_dir, level2_paged_name);	
+		lod->setFileName(1,/*level2_paged_name*/rel_path);
+		lod->setRange(1, 0, /*zoom_boundary*/radius);
+		lod->setRange(0, radius, FLT_MAX);
+
+
+		// 写下lod
+		lod->setCenter(lod->getBound().center());	
+		if (!osgDB::writeNodeFile(*lod,lod_filename))
+			std::cout<<out_dir<<" write failed.."<<std::endl;
 	}
-		
-
-	lod_filename = out_dir + "\\" + lod_filename;
-	level1_name = dir_name + "\\l1.ply";
-	level2_name = dir_name + "\\l2.ply";
-
-	std::string level_lod_dir = out_dir + "\\ive";
-	if (!osgDB::makeDirectory(level_lod_dir))
-	{
-		osg::notify(osg::NOTICE)<<"failed to create ive directory."<<std::endl;
-		return 1;
-	}
-	
-
-	// 读取第一层
-	osg::ref_ptr<osg::PagedLOD> lod = new osg::PagedLOD;
-	lod->addChild(osgDB::readNodeFile(level1_name), 15.f, FLT_MAX);
-	//lod->addChild(osgDB::readNodeFile(level2_name), 0., 15.f);
-
-
-	// 把次层写成pagedlod格式并加入第一层
- 	std::string level2_paged_name( level_lod_dir + "\\level2" + output_ext );
-	osg::ref_ptr<osg::PagedLOD> lod_2 = new osg::PagedLOD;
-	lod_2->addChild(osgDB::readNodeFile(level2_name), 0, FLT_MAX);
-	if (!osgDB::writeNodeFile(*lod_2, level2_paged_name))
-		std::cout<<level2_paged_name<<" write failed.."<<std::endl;
-	std::string rel_path = osgDB::getPathRelative(out_dir, level2_paged_name);	
-  	lod->setFileName(1,/*level2_paged_name*/rel_path);
-  	lod->setRange(1, 0, 15.);
-
-	
-	// 写下lod
-	lod->setCenter(lod->getBound().center());
-	if (!osgDB::writeNodeFile(*lod,lod_filename))
-		std::cout<<out_dir<<" write failed.."<<std::endl;
 
 	return 0;
 }
