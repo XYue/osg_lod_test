@@ -1,6 +1,6 @@
 #include <iostream>
 
-//#include <windows.h>
+#include <istream>
 
 #include <osg/Group>
 #include <osg/Notify>
@@ -274,10 +274,10 @@ int proxy_main_pagedlod_test( int argc, char **argv )
 	return 0;
 }
 
-inline bool sphere_contained(const osg::BoundingSphere & main_sphere,
+inline bool sphere_contained_most(const osg::BoundingSphere & main_sphere,
 							 const osg::BoundingSphere & test_sphere)
 {
-	double max_dist_bt_centers = main_sphere.radius() - test_sphere.radius();
+	double max_dist_bt_centers = main_sphere.radius() - test_sphere.radius()/2.;
 	if (max_dist_bt_centers >= 0 &&
 		(main_sphere.center() - test_sphere.center()).length() <= max_dist_bt_centers)
 		return true;
@@ -328,14 +328,133 @@ int process_config_file(const std::string & config_filename,
 
 	do 
 	{
-		std::string lod_filename = out_dir + "\\out" + output_ext;
+		std::string lod_filename = out_dir + "\\out" + ".osg"/*output_ext*/;
 
 		std::string top_level_filename;
 		std::vector<std::string> level_directories;
+		std::vector<std::string> pagedlod_children;
+		std::string node_file_ext = "obj";
+
 
 		// 读取config文件
+		std::ifstream config_file(config_filename);
+		if (!config_file.good()) break;
+
+		std::string line;
+		std::getline(config_file, line);
+		if (!osgDB::fileExists(line) || osgDB::fileType(line) != osgDB::REGULAR_FILE) break;
+		top_level_filename = line;
+
+		while (config_file.good())
+		{
+			line.clear();
+			std::getline(config_file, line);
+			if (osgDB::fileExists(line) && osgDB::fileType(line) == osgDB::DIRECTORY) 
+				level_directories.push_back(line);
+		}
+
 
 		// 每个阶层处理
+		std::vector<osg::BoundingSphere> bounding_sphere_children;
+		std::string level_ive_dir = out_dir + "\\ive";
+		if (!osgDB::makeDirectory(level_ive_dir))
+		{
+			osg::notify(osg::NOTICE)<<"failed to create ive directory."<<std::endl;
+			goto error0;
+		}
+		while (level_directories.size() > 0)
+		{
+			int level_index = level_directories.size();
+			std::stringstream sstr;
+			std::string tmp_index;
+			sstr << level_index;
+			sstr >> tmp_index;
+			std::string output_level_dir = level_ive_dir + "\\" + tmp_index;
+			if (!osgDB::makeDirectory(output_level_dir))
+			{
+				osg::notify(osg::NOTICE)<<"failed to create ive directory."<<std::endl;
+				goto error0;
+			}
+
+
+			if (bounding_sphere_children.size() != pagedlod_children.size())
+				goto error0;
+
+
+			std::string level_dir = level_directories.back();
+			
+			osgDB::DirectoryContents dir_contents = osgDB::getDirectoryContents(level_dir);
+			size_t num_content = dir_contents.size();
+			std::vector<std::string> current_pagedlod_filename;
+			std::vector<osg::BoundingSphere> current_bounding_spheres;
+			for (int i_c = 0; i_c < num_content; ++i_c)
+			{
+				std::string content_name = level_dir + "\\"+dir_contents[i_c];
+				if (osgDB::fileType(content_name) != osgDB::REGULAR_FILE ||
+					osgDB::getFileExtension(content_name).compare(node_file_ext))
+					continue;
+				
+				
+				std::string output_pagedlod_name = output_level_dir + 
+					"\\" + osgDB::getNameLessExtension(osgDB::getSimpleFileName(content_name)) + output_ext;
+
+
+				// convert to pagedlod node
+				osg::ref_ptr<osg::PagedLOD> lod = new osg::PagedLOD;
+				lod->addChild(osgDB::readNodeFile(content_name), 0, FLT_MAX);
+				float radius = lod->getBound().radius();
+
+
+				// add children if exists
+				for (int i_ch = 0; i_ch < pagedlod_children.size(); ++i_ch)
+				{	
+					// if contained
+					if (!sphere_contained_most(lod->getBound(), bounding_sphere_children[i_ch]))
+						continue;
+
+					// add as child
+					std::string rel_path = osgDB::getPathRelative(out_dir, pagedlod_children[i_ch]);	
+					lod->setFileName(i_ch + 1, rel_path);
+					lod->setRange(i_ch + 1, 0, radius);
+				}				
+
+
+				// save file
+				radius = pagedlod_children.size() > 0 ? radius : 0;
+				lod->setRange(0, radius, FLT_MAX);
+				lod->setCenter(lod->getBound().center());	
+				if (!osgDB::writeNodeFile(*lod,output_pagedlod_name))
+					std::cout<<output_pagedlod_name<<" write failed.."<<std::endl;
+
+
+				// insert to children (filename and bounding sphere)
+				current_pagedlod_filename.push_back(output_pagedlod_name);
+				current_bounding_spheres.push_back(lod->getBound());
+			}			
+			
+
+			pagedlod_children.swap(current_pagedlod_filename);
+			bounding_sphere_children.swap(current_bounding_spheres);
+
+			level_directories.pop_back();
+		}
+
+
+		// top level pagedlode
+		osg::ref_ptr<osg::PagedLOD> lod = new osg::PagedLOD;
+		lod->addChild(osgDB::readNodeFile(top_level_filename), 0, FLT_MAX);
+		float top_level_radius = lod->getBound().radius();
+		for (int i_ch = 0; i_ch < pagedlod_children.size(); ++i_ch)
+		{			
+			std::string rel_path = osgDB::getPathRelative(out_dir, pagedlod_children[i_ch]);	
+			lod->setFileName(i_ch + 1, rel_path);
+			lod->setRange(i_ch + 1, 0, top_level_radius);
+		}
+		lod->setRange(0, top_level_radius, FLT_MAX);
+		lod->setCenter(lod->getBound().center());	
+		if (!osgDB::writeNodeFile(*lod,lod_filename))
+			std::cout<<lod_filename<<" write failed.."<<std::endl;
+
 
 		ret = 0;
 	} while (0);
@@ -389,6 +508,17 @@ int proxy_main_custom_test(int argc, char ** argv)
 	}
 
 	while (arguments.read("-config",config_file)) {}
+
+	// any option left unread are converted into errors to write out later.
+	arguments.reportRemainingOptionsAsUnrecognized();
+
+	// report any errors if they have occurred when parsing the program arguments.
+	if (arguments.errors())
+	{
+		arguments.writeErrorMessages(std::cout);
+		return 1;
+	}
+
 	if (!config_file.empty())
 	{
 		if (process_config_file(config_file, out_dir, output_ext))
@@ -396,25 +526,7 @@ int proxy_main_custom_test(int argc, char ** argv)
 			std::cout<<"process confif file failed."<<std::endl;
 			return 1;
 		}
-	} else {
-		// tt
-		osgDB::DirectoryContents dir_contents = osgDB::getDirectoryContents(dir_name);
-		for (int i = 0; i < dir_contents.size(); ++i)
-		{
-			std::cout<<osgDB::fileType(dir_name + "\\"+dir_contents[i])<<std::endl;
-		}
-
-		// any option left unread are converted into errors to write out later.
-		arguments.reportRemainingOptionsAsUnrecognized();
-
-		// report any errors if they have occurred when parsing the program arguments.
-		if (arguments.errors())
-		{
-			arguments.writeErrorMessages(std::cout);
-			return 1;
-		}
-
-
+	} else {			
 		lod_filename = out_dir + "\\" + lod_filename;
 		level1_name = dir_name + "\\l1.ive";
 		level2_name = dir_name + "\\test.obj";
