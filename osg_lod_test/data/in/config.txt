@@ -1,0 +1,3 @@
+D:\struct_lib_code\GitHub\osg_lod_test\osg_lod_test\data\in\l1.ive
+D:\struct_lib_code\GitHub\osg_lod_test\osg_lod_test\data\in\2_2
+D:\struct_lib_code\GitHub\osg_lod_test\osg_lod_test\data\in\4_4
