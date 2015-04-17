@@ -328,7 +328,7 @@ int process_config_file(const std::string & config_filename,
 
 	do 
 	{
-		std::string lod_filename = out_dir + "\\out" + ".osg"/*output_ext*/;
+		std::string lod_filename = out_dir + "\\out" + ".ive"/*output_ext*/;
 
 		std::string top_level_filename;
 		std::vector<std::string> level_directories;
@@ -369,12 +369,12 @@ int process_config_file(const std::string & config_filename,
 			std::string tmp_index;
 			sstr << level_index;
 			sstr >> tmp_index;
-			std::string output_level_dir = level_ive_dir + "\\" + tmp_index;
-			if (!osgDB::makeDirectory(output_level_dir))
-			{
-				osg::notify(osg::NOTICE)<<"failed to create ive directory."<<std::endl;
-				goto error0;
-			}
+// 			std::string output_level_dir = level_ive_dir + "\\" + tmp_index;
+// 			if (!osgDB::makeDirectory(output_level_dir))
+// 			{
+// 				osg::notify(osg::NOTICE)<<"failed to create ive directory."<<std::endl;
+// 				goto error0;
+// 			}
 
 
 			if (bounding_sphere_children.size() != pagedlod_children.size())
@@ -395,8 +395,9 @@ int process_config_file(const std::string & config_filename,
 					continue;
 				
 				
-				std::string output_pagedlod_name = output_level_dir + 
-					"\\" + osgDB::getNameLessExtension(osgDB::getSimpleFileName(content_name)) + output_ext;
+				std::string output_pagedlod_name = level_ive_dir + 
+					"\\" + tmp_index + "_" +
+					osgDB::getNameLessExtension(osgDB::getSimpleFileName(content_name)) + output_ext;
 
 
 				// convert to pagedlod node
@@ -406,21 +407,24 @@ int process_config_file(const std::string & config_filename,
 
 
 				// add children if exists
+				int num_added_children = 0;
 				for (int i_ch = 0; i_ch < pagedlod_children.size(); ++i_ch)
 				{	
 					// if contained
 					if (!sphere_contained_most(lod->getBound(), bounding_sphere_children[i_ch]))
 						continue;
-
+					
 					// add as child
-					std::string rel_path = osgDB::getPathRelative(out_dir, pagedlod_children[i_ch]);	
-					lod->setFileName(i_ch + 1, rel_path);
-					lod->setRange(i_ch + 1, 0, radius);
+					//std::string rel_path = osgDB::getPathRelative(level_dir, pagedlod_children[i_ch]);	
+					lod->setFileName(num_added_children + 1, /*rel_path*/osgDB::getSimpleFileName(pagedlod_children[i_ch]));
+					lod->setRange(num_added_children + 1, 0, radius);
+
+					++num_added_children;
 				}				
 
 
 				// save file
-				radius = pagedlod_children.size() > 0 ? radius : 0;
+				radius = num_added_children > 0 ? radius : 0;
 				lod->setRange(0, radius, FLT_MAX);
 				lod->setCenter(lod->getBound().center());	
 				if (!osgDB::writeNodeFile(*lod,output_pagedlod_name))
@@ -484,7 +488,7 @@ int proxy_main_custom_test(int argc, char ** argv)
 	}
 
 
-	std::string output_ext(".osg");
+	std::string output_ext(".ive");
 	std::string lod_filename = "out" + output_ext;
 	std::string out_dir("");
 	std::string dir_name("");
