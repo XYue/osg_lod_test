@@ -320,6 +320,147 @@ error0:
 	return ret;
 }
 
+int process_config_file2(const std::string & config_filename,
+						const std::string & out_dir,
+						const std::string & output_ext)
+{
+	int ret = -1;
+
+	do 
+	{
+		std::string lod_filename = out_dir + "\\out" + ".ive"/*output_ext*/;
+
+		std::string top_level_filename;
+		std::vector<std::string> level_directories;
+		std::vector<std::string> pagedlod_children;
+		std::string node_file_ext = "obj";
+
+
+		// 读取config文件
+		std::ifstream config_file(config_filename);
+		if (!config_file.good()) break;
+
+		std::string line;
+		std::getline(config_file, line);
+		if (!osgDB::fileExists(line) || osgDB::fileType(line) != osgDB::REGULAR_FILE) break;
+		top_level_filename = line;
+
+		while (config_file.good())
+		{
+			line.clear();
+			std::getline(config_file, line);
+			if (osgDB::fileExists(line) && osgDB::fileType(line) == osgDB::DIRECTORY) 
+				level_directories.push_back(line);
+		}
+
+
+		// 每个阶层处理
+		std::vector<osg::BoundingSphere> bounding_sphere_children;
+		std::string level_ive_dir = out_dir + "\\ive";
+		if (!osgDB::makeDirectory(level_ive_dir))
+		{
+			osg::notify(osg::NOTICE)<<"failed to create ive directory."<<std::endl;
+			goto error0;
+		}
+		while (level_directories.size() > 0)
+		{
+			int level_index = level_directories.size();
+			std::stringstream sstr;
+			std::string tmp_index;
+			sstr << level_index;
+			sstr >> tmp_index;
+
+
+			if (bounding_sphere_children.size() != pagedlod_children.size())
+				goto error0;
+
+
+			std::string level_dir = level_directories.back();
+
+			osgDB::DirectoryContents dir_contents = osgDB::getDirectoryContents(level_dir);
+			size_t num_content = dir_contents.size();
+			std::vector<std::string> current_pagedlod_filename;
+			std::vector<osg::BoundingSphere> current_bounding_spheres;
+			for (int i_c = 0; i_c < num_content; ++i_c)
+			{
+				std::string content_name = level_dir + "\\"+dir_contents[i_c];
+				if (osgDB::fileType(content_name) != osgDB::REGULAR_FILE ||
+					osgDB::getFileExtension(content_name).compare(node_file_ext))
+					continue;
+
+
+				std::string output_pagedlod_name = level_ive_dir + 
+					"\\" + tmp_index + "_" +
+					osgDB::getNameLessExtension(osgDB::getSimpleFileName(content_name)) + output_ext;
+
+
+				// convert to pagedlod node
+				osg::ref_ptr<osg::PagedLOD> lod = new osg::PagedLOD;
+				lod->addChild(osgDB::readNodeFile(content_name), 0, FLT_MAX);
+				float radius = lod->getBound().radius() * 1.5;
+
+
+				// add children if exists
+				int num_added_children = 0;
+				for (int i_ch = 0; i_ch < pagedlod_children.size(); ++i_ch)
+				{	
+					// if contained
+					if (!sphere_contained_most(lod->getBound(), bounding_sphere_children[i_ch]))
+						continue;
+
+					// add as child
+					//std::string rel_path = osgDB::getPathRelative(level_dir, pagedlod_children[i_ch]);	
+					lod->setFileName(num_added_children + 1, /*rel_path*/osgDB::getSimpleFileName(pagedlod_children[i_ch]));
+					lod->setRange(num_added_children + 1, 0, radius);
+
+					++num_added_children;
+				}				
+
+
+				// save file
+				radius = num_added_children > 0 ? radius : 0;
+				lod->setRange(0, radius, FLT_MAX);
+				lod->setCenter(lod->getBound().center());	
+				if (!osgDB::writeNodeFile(*lod,output_pagedlod_name))
+					std::cout<<output_pagedlod_name<<" write failed.."<<std::endl;
+
+
+				// insert to children (filename and bounding sphere)
+				current_pagedlod_filename.push_back(output_pagedlod_name);
+				current_bounding_spheres.push_back(lod->getBound());
+			}			
+
+
+			pagedlod_children.swap(current_pagedlod_filename);
+			bounding_sphere_children.swap(current_bounding_spheres);
+
+			level_directories.pop_back();
+		}
+
+
+		// top level pagedlode
+		osg::ref_ptr<osg::PagedLOD> lod = new osg::PagedLOD;
+		lod->addChild(osgDB::readNodeFile(top_level_filename), 0, FLT_MAX);
+		float top_level_radius = lod->getBound().radius() * 1.5;
+		for (int i_ch = 0; i_ch < pagedlod_children.size(); ++i_ch)
+		{			
+			std::string rel_path = osgDB::getPathRelative(out_dir, pagedlod_children[i_ch]);	
+			lod->setFileName(i_ch + 1, rel_path);
+			lod->setRange(i_ch + 1, 0, top_level_radius);
+		}
+		lod->setRange(0, top_level_radius, FLT_MAX);
+		lod->setCenter(lod->getBound().center());	
+		if (!osgDB::writeNodeFile(*lod,lod_filename))
+			std::cout<<lod_filename<<" write failed.."<<std::endl;
+
+
+		ret = 0;
+	} while (0);
+error0:
+
+	return ret;
+}
+
 int process_config_file(const std::string & config_filename,
 						const std::string & out_dir,
 						const std::string & output_ext)
@@ -403,7 +544,7 @@ int process_config_file(const std::string & config_filename,
 				// convert to pagedlod node
 				osg::ref_ptr<osg::PagedLOD> lod = new osg::PagedLOD;
 				lod->addChild(osgDB::readNodeFile(content_name), 0, FLT_MAX);
-				float radius = lod->getBound().radius();
+				float radius = lod->getBound().radius() * 1.5;
 
 
 				// add children if exists
@@ -447,7 +588,7 @@ int process_config_file(const std::string & config_filename,
 		// top level pagedlode
 		osg::ref_ptr<osg::PagedLOD> lod = new osg::PagedLOD;
 		lod->addChild(osgDB::readNodeFile(top_level_filename), 0, FLT_MAX);
-		float top_level_radius = lod->getBound().radius();
+		float top_level_radius = lod->getBound().radius() * 1.5;
 		for (int i_ch = 0; i_ch < pagedlod_children.size(); ++i_ch)
 		{			
 			std::string rel_path = osgDB::getPathRelative(out_dir, pagedlod_children[i_ch]);	
@@ -481,7 +622,7 @@ int proxy_main_custom_test(int argc, char ** argv)
 	arguments.getApplicationUsage()->addCommandLineOption("-dir","set the input directory");
 	arguments.getApplicationUsage()->addCommandLineOption("-config","set the config file.");
 
-	if (arguments.read("-h") || arguments.read("--help"))
+	if (arguments.read("-h") || arguments.read("--help") || argc < 3)
 	{
 		arguments.getApplicationUsage()->write(std::cout);
 		return 1;
@@ -504,12 +645,7 @@ int proxy_main_custom_test(int argc, char ** argv)
 		return 1;
 	}
 	
-	while (arguments.read("-dir",dir_name)) {}
-	if (dir_name.empty())
-	{
-		osg::notify(osg::NOTICE)<<"no input directory."<<std::endl;
-		return 1;
-	}
+	while (arguments.read("-dir",dir_name)) {}	
 
 	while (arguments.read("-config",config_file)) {}
 
@@ -525,12 +661,19 @@ int proxy_main_custom_test(int argc, char ** argv)
 
 	if (!config_file.empty())
 	{
-		if (process_config_file(config_file, out_dir, output_ext))
+		if (process_config_file2(config_file, out_dir, output_ext))
 		{
-			std::cout<<"process confif file failed."<<std::endl;
+			std::cout<<"process config file failed."<<std::endl;
 			return 1;
 		}
-	} else {			
+	} else {
+
+		if (dir_name.empty())
+		{
+			osg::notify(osg::NOTICE)<<"no input directory."<<std::endl;
+			return 1;
+		}
+
 		lod_filename = out_dir + "\\" + lod_filename;
 		level1_name = dir_name + "\\l1.ive";
 		level2_name = dir_name + "\\test.obj";
