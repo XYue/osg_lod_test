@@ -320,6 +320,35 @@ error0:
 	return ret;
 }
 
+inline std::string create_filename(int level, int x, int y)
+{
+	std::stringstream sstr;
+	sstr << "quad_"<<level<<"_"<<x<<"_"<<y<<".ive";
+	return sstr.str();
+}
+
+inline std::string get_child_filename(std::string dir, int x, int y)
+{
+	std::stringstream sstr;
+	sstr << "mesh_"<<x<<"_"<<y<<"_adj_model.obj";
+	std::string filename = dir + "\\" + sstr.str();
+	if (!osgDB::fileExists(filename) ||
+		osgDB::fileType(filename) != osgDB::REGULAR_FILE) 
+		filename = "";
+	return filename;
+}
+
+inline std::string get_quad_filename(std::string dir, int level, int x, int y)
+{
+	std::stringstream sstr;
+	sstr << "quad_"<<level<<"_"<<x<<"_"<<y<<".ive";
+	std::string filename = dir + "\\" + sstr.str();
+	if (!osgDB::fileExists(filename) ||
+		osgDB::fileType(filename) != osgDB::REGULAR_FILE) 
+		filename = "";
+	return filename;
+}
+
 int process_config_file2(const std::string & config_filename,
 						const std::string & out_dir,
 						const std::string & output_ext)
@@ -328,12 +357,14 @@ int process_config_file2(const std::string & config_filename,
 
 	do 
 	{
-		std::string lod_filename = out_dir + "\\out" + ".ive"/*output_ext*/;
+		std::string lod_filename = out_dir + "\\out" + output_ext;
 
 		std::string top_level_filename;
 		std::vector<std::string> level_directories;
 		std::vector<std::string> pagedlod_children;
 		std::string node_file_ext = "obj";
+
+		float radiu_param = 5.;
 
 
 		// 读取config文件
@@ -355,7 +386,7 @@ int process_config_file2(const std::string & config_filename,
 
 
 		// 每个阶层处理
-		std::vector<osg::BoundingSphere> bounding_sphere_children;
+		int num_levels = level_directories.size();
 		std::string level_ive_dir = out_dir + "\\ive";
 		if (!osgDB::makeDirectory(level_ive_dir))
 		{
@@ -365,74 +396,61 @@ int process_config_file2(const std::string & config_filename,
 		while (level_directories.size() > 0)
 		{
 			int level_index = level_directories.size();
-			std::stringstream sstr;
-			std::string tmp_index;
-			sstr << level_index;
-			sstr >> tmp_index;
-
-
-			if (bounding_sphere_children.size() != pagedlod_children.size())
-				goto error0;
-
-
+			int num_x_quad = pow(2, level_index - 1);
+			int num_y_quad = num_x_quad;
 			std::string level_dir = level_directories.back();
+			
 
-			osgDB::DirectoryContents dir_contents = osgDB::getDirectoryContents(level_dir);
-			size_t num_content = dir_contents.size();
-			std::vector<std::string> current_pagedlod_filename;
-			std::vector<osg::BoundingSphere> current_bounding_spheres;
-			for (int i_c = 0; i_c < num_content; ++i_c)
+			for (int i_yq = 0; i_yq < num_y_quad; ++i_yq)
 			{
-				std::string content_name = level_dir + "\\"+dir_contents[i_c];
-				if (osgDB::fileType(content_name) != osgDB::REGULAR_FILE ||
-					osgDB::getFileExtension(content_name).compare(node_file_ext))
-					continue;
+				for (int i_xq = 0; i_xq < num_x_quad; ++i_xq)
+				{
+					int x_start = i_xq * 2;
+					int y_start = i_yq * 2;
 
+					osg::ref_ptr<osg::Group> quad_group = new osg::Group;
+ 					for (int iy = y_start; iy < y_start + 2; ++iy)
+ 					{
+ 						for (int ix = x_start; ix < x_start + 2; ++ix)
+ 						{
+ 							osg::ref_ptr<osg::PagedLOD> plod = new osg::PagedLOD;
+ 
+ 							
+ 							std::string node_filename = get_child_filename(level_dir, ix, iy);
+ 							if (node_filename.empty()) continue;
+ 
+ 							if (!plod->addChild(osgDB::readNodeFile(node_filename)))
+ 							{
+ 								std::cout<<"insert "<<node_filename<<" failed."<<std::endl;
+ 								continue;
+ 							}
+ 							
+ 							float cutoff = plod->getBound().radius() * radiu_param;
+ 							if (level_index != num_levels)
+ 							{
+ 								std::string quad_file = get_quad_filename(level_ive_dir, level_index + 1, ix, iy);
+ 								if (quad_file.empty()) continue;								
+ 								std::string rel_path = osgDB::getPathRelative(level_ive_dir, quad_file);	
+ 								plod->setFileName(1, rel_path);
+ 								plod->setRange(1, 0, cutoff);
+ 							} else {
+ 								cutoff = 0.;
+ 							}
+ 
+ 							plod->setRange(0, cutoff, FLT_MAX);
+ 							plod->setCenterMode(osg::PagedLOD::USER_DEFINED_CENTER);
+ 							plod->setCenter(plod->getBound().center());	
+ 
+ 							quad_group->addChild(plod);
+ 						}
+ 					}
+										
+					if (!osgDB::writeNodeFile(*quad_group, 
+						level_ive_dir + "\\" + create_filename(level_index, i_xq, i_yq)))
+						std::cout<<lod_filename<<" write failed.."<<std::endl;
+				}
+			}
 
-				std::string output_pagedlod_name = level_ive_dir + 
-					"\\" + tmp_index + "_" +
-					osgDB::getNameLessExtension(osgDB::getSimpleFileName(content_name)) + output_ext;
-
-
-				// convert to pagedlod node
-				osg::ref_ptr<osg::PagedLOD> lod = new osg::PagedLOD;
-				lod->addChild(osgDB::readNodeFile(content_name), 0, FLT_MAX);
-				float radius = lod->getBound().radius() * 1.5;
-
-
-				// add children if exists
-				int num_added_children = 0;
-				for (int i_ch = 0; i_ch < pagedlod_children.size(); ++i_ch)
-				{	
-					// if contained
-					if (!sphere_contained_most(lod->getBound(), bounding_sphere_children[i_ch]))
-						continue;
-
-					// add as child
-					//std::string rel_path = osgDB::getPathRelative(level_dir, pagedlod_children[i_ch]);	
-					lod->setFileName(num_added_children + 1, /*rel_path*/osgDB::getSimpleFileName(pagedlod_children[i_ch]));
-					lod->setRange(num_added_children + 1, 0, radius);
-
-					++num_added_children;
-				}				
-
-
-				// save file
-				radius = num_added_children > 0 ? radius : 0;
-				lod->setRange(0, radius, FLT_MAX);
-				lod->setCenter(lod->getBound().center());	
-				if (!osgDB::writeNodeFile(*lod,output_pagedlod_name))
-					std::cout<<output_pagedlod_name<<" write failed.."<<std::endl;
-
-
-				// insert to children (filename and bounding sphere)
-				current_pagedlod_filename.push_back(output_pagedlod_name);
-				current_bounding_spheres.push_back(lod->getBound());
-			}			
-
-
-			pagedlod_children.swap(current_pagedlod_filename);
-			bounding_sphere_children.swap(current_bounding_spheres);
 
 			level_directories.pop_back();
 		}
@@ -440,18 +458,21 @@ int process_config_file2(const std::string & config_filename,
 
 		// top level pagedlode
 		osg::ref_ptr<osg::PagedLOD> lod = new osg::PagedLOD;
-		lod->addChild(osgDB::readNodeFile(top_level_filename), 0, FLT_MAX);
-		float top_level_radius = lod->getBound().radius() * 1.5;
-		for (int i_ch = 0; i_ch < pagedlod_children.size(); ++i_ch)
-		{			
-			std::string rel_path = osgDB::getPathRelative(out_dir, pagedlod_children[i_ch]);	
-			lod->setFileName(i_ch + 1, rel_path);
-			lod->setRange(i_ch + 1, 0, top_level_radius);
-		}
+		lod->insertChild(0, osgDB::readNodeFile(top_level_filename));
+		float top_level_radius = lod->getBound().radius() * radiu_param;
+		std::string quad_file = get_quad_filename(level_ive_dir, 1,0,0);
+		if (quad_file.empty()) break;
+		std::string rel_path = osgDB::getPathRelative(out_dir, quad_file);	
+		lod->setFileName(1, rel_path);
+		lod->setRange(1, 0, top_level_radius);
 		lod->setRange(0, top_level_radius, FLT_MAX);
+		lod->setCenterMode(osg::PagedLOD::USER_DEFINED_CENTER);
 		lod->setCenter(lod->getBound().center());	
 		if (!osgDB::writeNodeFile(*lod,lod_filename))
+		{
 			std::cout<<lod_filename<<" write failed.."<<std::endl;
+			break;
+		}
 
 
 		ret = 0;
