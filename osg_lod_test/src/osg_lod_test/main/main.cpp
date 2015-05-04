@@ -419,7 +419,15 @@ int process_config_file2(const std::string & config_filename,
  							std::string node_filename = get_child_filename(level_dir, ix, iy);
  							if (node_filename.empty()) continue;
  
- 							if (!plod->addChild(osgDB::readNodeFile(node_filename)))
+							osg::ref_ptr<osg::Node> node = osgDB::readNodeFile(node_filename);
+							//tt
+							{
+								if (!node)
+									std::cout<<node_filename<<" is null!" << std::endl;
+								if (plod->containsNode(node))
+									std::cout<<node_filename<<" is already contained."<<std::endl;
+							}
+ 							if (!plod->addChild(node))
  							{
  								std::cout<<"insert "<<node_filename<<" failed."<<std::endl;
  								continue;
@@ -458,7 +466,7 @@ int process_config_file2(const std::string & config_filename,
 
 		// top level pagedlode
 		osg::ref_ptr<osg::PagedLOD> lod = new osg::PagedLOD;
-		lod->insertChild(0, osgDB::readNodeFile(top_level_filename));
+		lod->addChild(osgDB::readNodeFile(top_level_filename));
 		float top_level_radius = lod->getBound().radius() * radiu_param;
 		std::string quad_file = get_quad_filename(level_ive_dir, 1,0,0);
 		if (quad_file.empty()) break;
@@ -738,9 +746,16 @@ int proxy_main_custom_test(int argc, char ** argv)
 	return 0;
 }
 
+inline void EnableMemLeakCheck(void)
+{
+	_CrtSetDbgFlag(_CrtSetDbgFlag(_CRTDBG_REPORT_FLAG) | _CRTDBG_LEAK_CHECK_DF);
+	//_CrtSetBreakAlloc(2586);
+}
 
 void main(int argc, char **argv)
 {
+	EnableMemLeakCheck();
+
 	int ret = -1;
 
 	//ret proxy_main_pagedlod_test(argc, argv);
