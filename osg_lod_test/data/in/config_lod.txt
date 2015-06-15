@@ -1,0 +1,5 @@
+E:\Misc\data\pingxiang\px8\lod_test\1\mesh_adj_model.osgb 
+E:\Misc\data\pingxiang\px8\lod_test\1\mesh_adj_model.obj.transformation
+
+
+

@@ -746,6 +746,83 @@ int proxy_main_custom_test(int argc, char ** argv)
 	return 0;
 }
 
+int transformation_main_proxy_test(int argc, char **argv)
+{
+	int ret = -1;
+
+	do 
+	{
+		// use an ArgumentParser object to manage the program arguments.
+		osg::ArgumentParser arguments(&argc,argv);
+
+		// set up the usage document, in case we need to print out how to use this program.
+		arguments.getApplicationUsage()->setApplicationName(arguments.getApplicationName());
+		arguments.getApplicationUsage()->setDescription(arguments.getApplicationName()+" blablablabla.");
+		arguments.getApplicationUsage()->setCommandLineUsage(arguments.getApplicationName()+" [options] -dir directory ...");
+		arguments.getApplicationUsage()->addCommandLineOption("-h or --help","Display this information");
+		arguments.getApplicationUsage()->addCommandLineOption("-o","set the output directory");
+		arguments.getApplicationUsage()->addCommandLineOption("-dir","set the input directory");
+		arguments.getApplicationUsage()->addCommandLineOption("-config","set the config file.");
+
+		if (arguments.read("-h") || arguments.read("--help") || argc < 3)
+		{
+			arguments.getApplicationUsage()->write(std::cout);
+			return 1;
+		}
+
+
+		std::string out_dir("");
+		std::string config_file("");
+
+
+		while (arguments.read("-o",out_dir)) {}
+		if (!osgDB::makeDirectory(out_dir))
+		{
+			osg::notify(osg::NOTICE)<<"failed to create output directory."<<std::endl;
+			return 1;
+		}
+
+		while (arguments.read("-config",config_file)) {}
+
+		// any option left unread are converted into errors to write out later.
+		arguments.reportRemainingOptionsAsUnrecognized();
+
+		// report any errors if they have occurred when parsing the program arguments.
+		if (arguments.errors())
+		{
+			arguments.writeErrorMessages(std::cout);
+			return 1;
+		}
+
+
+		std::string model_file, transform_file;
+
+		std::ifstream cfile(config_file);
+		if (cfile.good())
+		{
+			std::string line;
+			std::getline(cfile, line);
+			if (osgDB::fileExists(line) && osgDB::fileType(line) == osgDB::REGULAR_FILE) 
+				model_file = line;
+
+			line.clear();
+			if (cfile.good())
+			{
+				std::getline(cfile, line);
+				if (osgDB::fileExists(line) && osgDB::fileType(line) == osgDB::REGULAR_FILE) 
+					transform_file = line;
+			} else break;
+		} else break;
+
+
+
+		ret = 0;
+	} while (0);
+error0:
+
+	return ret;
+}
+
 inline void EnableMemLeakCheck(void)
 {
 	_CrtSetDbgFlag(_CrtSetDbgFlag(_CRTDBG_REPORT_FLAG) | _CRTDBG_LEAK_CHECK_DF);
@@ -760,7 +837,7 @@ void main(int argc, char **argv)
 
 	//ret proxy_main_pagedlod_test(argc, argv);
 
-	ret = proxy_main_custom_test(argc, argv);
+	ret = transformation_main_proxy_test(argc, argv);
 
 	if (ret)
 		std::cout<<"failed.."<<std::endl;

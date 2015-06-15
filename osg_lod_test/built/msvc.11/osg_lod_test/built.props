@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+            
+    <PropertyGroup>
+        <BOOST_CONFIG_LINK>$(BUILD_LINK)</BOOST_CONFIG_LINK>
+    </PropertyGroup>
+    
+    <ImportGroup Label="PropertySheets">
+        <Import
+            Project="$(MSBuildThisFileDirectory)..\..\..\..\..\..\Shared\boost\kit\boost_latest.props"
+            Condition="'$(BOOST_IMPORT)'!='true'" />
+    </ImportGroup>
+    
+</Project>
