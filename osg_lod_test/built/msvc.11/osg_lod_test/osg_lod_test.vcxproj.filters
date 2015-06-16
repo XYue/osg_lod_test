@@ -4,10 +4,21 @@
     <Filter Include="main">
       <UniqueIdentifier>{65a4dc07-e4a2-4f6d-af34-a7985574191b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="OrientationConverter">
+      <UniqueIdentifier>{ec213292-0392-40bc-a0ff-4ac314b62b05}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\osg_lod_test\main\main.cpp">
       <Filter>main</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\osg_lod_test\OrientationConverter\OrientationConverter.cpp">
+      <Filter>OrientationConverter</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\src\osg_lod_test\OrientationConverter\OrientationConverter.h">
+      <Filter>OrientationConverter</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

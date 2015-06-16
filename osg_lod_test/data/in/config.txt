@@ -1,7 +1,2 @@
-E:\Dev\GitHub\osg_lod_test\osg_lod_test\data\in\lod\1_1\mesh_adj_model.obj
-E:\Dev\GitHub\osg_lod_test\osg_lod_test\data\in\lod\1_2
-E:\Dev\GitHub\osg_lod_test\osg_lod_test\data\in\lod\1_3
-E:\Dev\GitHub\osg_lod_test\osg_lod_test\data\in\lod\2_1
-E:\Dev\GitHub\osg_lod_test\osg_lod_test\data\in\lod\2_2
-E:\Dev\GitHub\osg_lod_test\osg_lod_test\data\in\lod\2_3
-E:\Dev\GitHub\osg_lod_test\osg_lod_test\data\in\lod\3_1
+D:\struct_lib_code\GitHub\osg_lod_test\osg_lod_test\data\in\lod\test\mesh_adj_model.osgb
+E:\data\pingxiang\px8\combination_data\test\mesh_adj_model.obj.transformation

@@ -19,8 +19,12 @@
 
 #include <osgUtil/Optimizer>
 
+#include <Eigen/Core>
+
 #include <iostream>
 #include <sstream>
+
+#include "OrientationConverter.h"
 
 class NameVistor : public osg::NodeVisitor
 {
@@ -466,14 +470,22 @@ int process_config_file2(const std::string & config_filename,
 
 		// top level pagedlode
 		osg::ref_ptr<osg::PagedLOD> lod = new osg::PagedLOD;
-		lod->addChild(osgDB::readNodeFile(top_level_filename));
+
+		osg::ref_ptr<osg::Node> test_node = osgDB::readNodeFile(top_level_filename);
+		if (!test_node.valid()) break;
+
+		lod->addChild(/*osgDB::readNodeFile(top_level_filename)*/test_node);
 		float top_level_radius = lod->getBound().radius() * radiu_param;
 		std::string quad_file = get_quad_filename(level_ive_dir, 1,0,0);
-		if (quad_file.empty()) break;
-		std::string rel_path = osgDB::getPathRelative(out_dir, quad_file);	
-		lod->setFileName(1, rel_path);
-		lod->setRange(1, 0, top_level_radius);
-		lod->setRange(0, top_level_radius, FLT_MAX);
+		if (!quad_file.empty())
+		{
+			std::string rel_path = osgDB::getPathRelative(out_dir, quad_file);	
+			lod->setFileName(1, rel_path);
+			lod->setRange(1, 0, top_level_radius);
+			lod->setRange(0, top_level_radius, FLT_MAX);
+		} else
+			lod->setRange(0, 0, FLT_MAX);
+		
 		lod->setCenterMode(osg::PagedLOD::USER_DEFINED_CENTER);
 		lod->setCenter(lod->getBound().center());	
 		if (!osgDB::writeNodeFile(*lod,lod_filename))
@@ -776,12 +788,6 @@ int transformation_main_proxy_test(int argc, char **argv)
 
 
 		while (arguments.read("-o",out_dir)) {}
-		if (!osgDB::makeDirectory(out_dir))
-		{
-			osg::notify(osg::NOTICE)<<"failed to create output directory."<<std::endl;
-			return 1;
-		}
-
 		while (arguments.read("-config",config_file)) {}
 
 		// any option left unread are converted into errors to write out later.
@@ -814,7 +820,65 @@ int transformation_main_proxy_test(int argc, char **argv)
 			} else break;
 		} else break;
 
+		// read transformation
+		Eigen::Matrix3d rot;
+		Eigen::Vector3d trans;
+		double scale;
+		std::ifstream t_file(transform_file);
+		if (t_file.good())
+		{
+			std::string line;
+			std::stringstream sstr;
 
+			line.clear(); line = "";
+			sstr.clear(); sstr.str("");
+			if (!t_file.good()) break;
+			std::getline(t_file, line);
+			if (line.empty()) break;
+			sstr << line;
+			sstr >> rot(0,0) >> rot(0,1) >> rot(0,2)
+				>> rot(1,0) >> rot(1,1) >> rot(1,2)
+				>> rot(2,0) >> rot(2,1) >> rot(2,2);
+
+			line.clear(); line = "";
+			sstr.clear(); sstr.str("");
+			if (!t_file.good()) break;
+			std::getline(t_file, line);
+			if (line.empty()) break;
+			sstr << line;
+			sstr >> trans(0) >> trans(1) >> trans(2);
+
+			line.clear(); line = "";
+			sstr.clear(); sstr.str("");
+			if (!t_file.good()) break;
+			std::getline(t_file, line);
+			if (line.empty()) break;
+			sstr << line;
+			sstr >> scale;
+
+			t_file.close();
+		}
+
+
+		// convert
+		OrientationConverter oc;
+		Eigen::Vector3d eigen_to =/* scale **/ rot * Eigen::Vector3d(1,1,1)/* + trans*/;
+		osg::Vec3 from(1,1,1), 
+			to(eigen_to(0),eigen_to(1),eigen_to(2));			
+		osg::Vec3 osg_trans(trans(0),trans(1),trans(2));
+		osg::Vec3 osg_scale(scale, scale, scale);
+
+		oc.setRotation(from, to);
+		oc.setTranslation(osg_trans);
+		oc.setScale(osg_scale);
+
+		// tt
+		osg::ref_ptr<osg::Node> root = osgDB::readNodeFile(model_file);
+		if (!root.valid()) break;
+		root = oc.convert( root.get() );
+
+		if (!osgDB::writeNodeFile(*root,out_dir + "\\transform.osgb"))
+			std::cout<<out_dir<<" write failed.."<<std::endl;
 
 		ret = 0;
 	} while (0);
@@ -838,6 +902,7 @@ void main(int argc, char **argv)
 	//ret proxy_main_pagedlod_test(argc, argv);
 
 	ret = transformation_main_proxy_test(argc, argv);
+	//ret = proxy_main_custom_test(argc, argv);
 
 	if (ret)
 		std::cout<<"failed.."<<std::endl;
