@@ -15,6 +15,9 @@ class OrientationConverter {
         void setTranslation( const osg::Vec3 &trans);
         void setScale( const osg::Vec3 &trans);
         void useWorldFrame( bool worldFrame );
+
+		// tt
+		void setRotation(const osg::Matrix & rot);
         
         /** return the root of the updated subgraph as the subgraph
           * the node passed in my flatten during optimization.*/

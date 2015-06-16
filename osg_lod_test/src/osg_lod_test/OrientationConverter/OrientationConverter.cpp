@@ -26,6 +26,11 @@ void OrientationConverter::setRotation( float degrees, const Vec3 &axis )
     R = Matrix::rotate( osg::DegreesToRadians(degrees), axis );
 }
 
+void OrientationConverter::setRotation(const osg::Matrix & rot)
+{
+	R = rot;
+}
+
 void OrientationConverter::setTranslation( const Vec3 &trans )
 {
     T = Matrix::translate(trans);

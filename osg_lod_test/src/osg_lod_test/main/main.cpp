@@ -19,12 +19,85 @@
 
 #include <osgUtil/Optimizer>
 
-#include <Eigen/Core>
+#include <Eigen/Dense>
 
 #include <iostream>
 #include <sstream>
 
 #include "OrientationConverter.h"
+
+class TestVistor : public osg::NodeVisitor
+{
+public:
+	TestVistor(Eigen::Matrix3d rot, Eigen::Vector3d trans, double scale):
+		osg::NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN),
+		_rot(rot), _trans(trans), _scale(scale)
+	{
+	}
+
+	virtual void apply(osg::Geode &geode)
+	{
+		unsigned int    vertNum = 0;
+		unsigned int numGeoms = geode.getNumDrawables();
+
+
+		for( unsigned int geodeIdx = 0; geodeIdx < numGeoms; geodeIdx++ ) 
+		{
+			osg::Geometry *curGeom = geode.getDrawable( geodeIdx )->asGeometry();
+
+			if ( curGeom )
+			{
+				osg::Vec3Array * ver_array = dynamic_cast< osg::Vec3Array *>(curGeom->getVertexArray());
+				if ( ver_array ) 
+				{
+					std::cout<<"ver_array"<<std::endl;
+					std::stringstream sstr;
+					sstr << geodeIdx;
+					//std::ofstream file(sstr.str() + ".txt");
+					for ( unsigned int i = 0; i < ver_array->size(); i++ ) {
+
+						osg::Vec3 * v = &ver_array->operator [](i);
+						//std::cout<<v->_v[0]<<" "<<v->_v[1]<<" "<<v->_v[2]<<std::endl;
+
+// 						if (file.good())
+// 						{
+// 							file << v->_v[0]<<" "<<v->_v[1]<<" "<<v->_v[2]<<std::endl;
+// 						}
+
+						Eigen::Vector3d ver(v->_v[0],v->_v[1],v->_v[2]);
+						ver = _scale * _rot * ver + _trans;
+						v->_v[0] = ver(0);
+						v->_v[1] = ver(1);
+						v->_v[2] = ver(2);
+					}
+				}     
+
+				osg::Vec3Array * n_array = dynamic_cast< osg::Vec3Array *>(curGeom->getNormalArray());
+				if ( n_array ) 
+				{
+					std::cout<<"n_array"<<std::endl;
+					std::stringstream sstr;
+					sstr << geodeIdx;
+					//std::ofstream file(sstr.str() + ".txt");
+					for ( unsigned int i = 0; i < n_array->size(); i++ ) {
+
+						osg::Vec3 * v = &n_array->operator [](i);
+						Eigen::Vector3d ver(v->_v[0],v->_v[1],v->_v[2]);
+						ver =  _rot * ver ;
+						v->_v[0] = ver(0);
+						v->_v[1] = ver(1);
+						v->_v[2] = ver(2);
+					}
+				}  
+			}
+
+		}
+	}    
+
+	Eigen::Matrix3d _rot;
+	Eigen::Vector3d _trans;
+	double _scale;
+};
 
 class NameVistor : public osg::NodeVisitor
 {
@@ -279,7 +352,7 @@ int proxy_main_pagedlod_test( int argc, char **argv )
 }
 
 inline bool sphere_contained_most(const osg::BoundingSphere & main_sphere,
-							 const osg::BoundingSphere & test_sphere)
+								  const osg::BoundingSphere & test_sphere)
 {
 	double max_dist_bt_centers = main_sphere.radius() - test_sphere.radius()/2.;
 	if (max_dist_bt_centers >= 0 &&
@@ -354,8 +427,8 @@ inline std::string get_quad_filename(std::string dir, int level, int x, int y)
 }
 
 int process_config_file2(const std::string & config_filename,
-						const std::string & out_dir,
-						const std::string & output_ext)
+						 const std::string & out_dir,
+						 const std::string & output_ext)
 {
 	int ret = -1;
 
@@ -403,7 +476,7 @@ int process_config_file2(const std::string & config_filename,
 			int num_x_quad = pow(2, level_index - 1);
 			int num_y_quad = num_x_quad;
 			std::string level_dir = level_directories.back();
-			
+
 
 			for (int i_yq = 0; i_yq < num_y_quad; ++i_yq)
 			{
@@ -413,16 +486,16 @@ int process_config_file2(const std::string & config_filename,
 					int y_start = i_yq * 2;
 
 					osg::ref_ptr<osg::Group> quad_group = new osg::Group;
- 					for (int iy = y_start; iy < y_start + 2; ++iy)
- 					{
- 						for (int ix = x_start; ix < x_start + 2; ++ix)
- 						{
- 							osg::ref_ptr<osg::PagedLOD> plod = new osg::PagedLOD;
- 
- 							
- 							std::string node_filename = get_child_filename(level_dir, ix, iy);
- 							if (node_filename.empty()) continue;
- 
+					for (int iy = y_start; iy < y_start + 2; ++iy)
+					{
+						for (int ix = x_start; ix < x_start + 2; ++ix)
+						{
+							osg::ref_ptr<osg::PagedLOD> plod = new osg::PagedLOD;
+
+
+							std::string node_filename = get_child_filename(level_dir, ix, iy);
+							if (node_filename.empty()) continue;
+
 							osg::ref_ptr<osg::Node> node = osgDB::readNodeFile(node_filename);
 							//tt
 							{
@@ -431,32 +504,32 @@ int process_config_file2(const std::string & config_filename,
 								if (plod->containsNode(node))
 									std::cout<<node_filename<<" is already contained."<<std::endl;
 							}
- 							if (!plod->addChild(node))
- 							{
- 								std::cout<<"insert "<<node_filename<<" failed."<<std::endl;
- 								continue;
- 							}
- 							
- 							float cutoff = plod->getBound().radius() * radiu_param;
- 							if (level_index != num_levels)
- 							{
- 								std::string quad_file = get_quad_filename(level_ive_dir, level_index + 1, ix, iy);
- 								if (quad_file.empty()) continue;								
- 								std::string rel_path = osgDB::getPathRelative(level_ive_dir, quad_file);	
- 								plod->setFileName(1, rel_path);
- 								plod->setRange(1, 0, cutoff);
- 							} else {
- 								cutoff = 0.;
- 							}
- 
- 							plod->setRange(0, cutoff, FLT_MAX);
- 							plod->setCenterMode(osg::PagedLOD::USER_DEFINED_CENTER);
- 							plod->setCenter(plod->getBound().center());	
- 
- 							quad_group->addChild(plod);
- 						}
- 					}
-										
+							if (!plod->addChild(node))
+							{
+								std::cout<<"insert "<<node_filename<<" failed."<<std::endl;
+								continue;
+							}
+
+							float cutoff = plod->getBound().radius() * radiu_param;
+							if (level_index != num_levels)
+							{
+								std::string quad_file = get_quad_filename(level_ive_dir, level_index + 1, ix, iy);
+								if (quad_file.empty()) continue;								
+								std::string rel_path = osgDB::getPathRelative(level_ive_dir, quad_file);	
+								plod->setFileName(1, rel_path);
+								plod->setRange(1, 0, cutoff);
+							} else {
+								cutoff = 0.;
+							}
+
+							plod->setRange(0, cutoff, FLT_MAX);
+							plod->setCenterMode(osg::PagedLOD::USER_DEFINED_CENTER);
+							plod->setCenter(plod->getBound().center());	
+
+							quad_group->addChild(plod);
+						}
+					}
+
 					if (!osgDB::writeNodeFile(*quad_group, 
 						level_ive_dir + "\\" + create_filename(level_index, i_xq, i_yq)))
 						std::cout<<lod_filename<<" write failed.."<<std::endl;
@@ -485,7 +558,7 @@ int process_config_file2(const std::string & config_filename,
 			lod->setRange(0, top_level_radius, FLT_MAX);
 		} else
 			lod->setRange(0, 0, FLT_MAX);
-		
+
 		lod->setCenterMode(osg::PagedLOD::USER_DEFINED_CENTER);
 		lod->setCenter(lod->getBound().center());	
 		if (!osgDB::writeNodeFile(*lod,lod_filename))
@@ -551,12 +624,12 @@ int process_config_file(const std::string & config_filename,
 			std::string tmp_index;
 			sstr << level_index;
 			sstr >> tmp_index;
-// 			std::string output_level_dir = level_ive_dir + "\\" + tmp_index;
-// 			if (!osgDB::makeDirectory(output_level_dir))
-// 			{
-// 				osg::notify(osg::NOTICE)<<"failed to create ive directory."<<std::endl;
-// 				goto error0;
-// 			}
+			// 			std::string output_level_dir = level_ive_dir + "\\" + tmp_index;
+			// 			if (!osgDB::makeDirectory(output_level_dir))
+			// 			{
+			// 				osg::notify(osg::NOTICE)<<"failed to create ive directory."<<std::endl;
+			// 				goto error0;
+			// 			}
 
 
 			if (bounding_sphere_children.size() != pagedlod_children.size())
@@ -564,7 +637,7 @@ int process_config_file(const std::string & config_filename,
 
 
 			std::string level_dir = level_directories.back();
-			
+
 			osgDB::DirectoryContents dir_contents = osgDB::getDirectoryContents(level_dir);
 			size_t num_content = dir_contents.size();
 			std::vector<std::string> current_pagedlod_filename;
@@ -575,8 +648,8 @@ int process_config_file(const std::string & config_filename,
 				if (osgDB::fileType(content_name) != osgDB::REGULAR_FILE ||
 					osgDB::getFileExtension(content_name).compare(node_file_ext))
 					continue;
-				
-				
+
+
 				std::string output_pagedlod_name = level_ive_dir + 
 					"\\" + tmp_index + "_" +
 					osgDB::getNameLessExtension(osgDB::getSimpleFileName(content_name)) + output_ext;
@@ -595,7 +668,7 @@ int process_config_file(const std::string & config_filename,
 					// if contained
 					if (!sphere_contained_most(lod->getBound(), bounding_sphere_children[i_ch]))
 						continue;
-					
+
 					// add as child
 					//std::string rel_path = osgDB::getPathRelative(level_dir, pagedlod_children[i_ch]);	
 					lod->setFileName(num_added_children + 1, /*rel_path*/osgDB::getSimpleFileName(pagedlod_children[i_ch]));
@@ -617,7 +690,7 @@ int process_config_file(const std::string & config_filename,
 				current_pagedlod_filename.push_back(output_pagedlod_name);
 				current_bounding_spheres.push_back(lod->getBound());
 			}			
-			
+
 
 			pagedlod_children.swap(current_pagedlod_filename);
 			bounding_sphere_children.swap(current_bounding_spheres);
@@ -685,7 +758,7 @@ int proxy_main_custom_test(int argc, char ** argv)
 		osg::notify(osg::NOTICE)<<"failed to create output directory."<<std::endl;
 		return 1;
 	}
-	
+
 	while (arguments.read("-dir",dir_name)) {}	
 
 	while (arguments.read("-config",config_file)) {}
@@ -862,20 +935,39 @@ int transformation_main_proxy_test(int argc, char **argv)
 
 		// convert
 		OrientationConverter oc;
-		Eigen::Vector3d eigen_to =/* scale **/ rot * Eigen::Vector3d(1,1,1)/* + trans*/;
-		osg::Vec3 from(1,1,1), 
-			to(eigen_to(0),eigen_to(1),eigen_to(2));			
+
+		// 		Eigen::Vector3d eigen_to =/* scale **/ rot * Eigen::Vector3d(1,1,1)/* + trans*/;
+		// 		osg::Vec3 from(1,1,1), 
+		// 			to(eigen_to(0),eigen_to(1),eigen_to(2));
+
+		Eigen::Quaternion<double, Eigen::AutoAlign> quat(rot);
+
+		// 		osg::Matrix osg_rot(rot(0,0), rot(0,1), rot(0,2), 0,
+		// 			rot(1,0), rot(1,1), rot(1,2), 0,
+		// 			rot(2,0), rot(2,1), rot(2,2), 0,
+		// 			0,0,0, 1);
+
+		osg::Matrix osg_rot;
+		osg::Quat osg_quat(quat.x(), quat.y(), quat.z(), quat.w());
+		osg_rot.setRotate(osg_quat);
+
 		osg::Vec3 osg_trans(trans(0),trans(1),trans(2));
 		osg::Vec3 osg_scale(scale, scale, scale);
 
-		oc.setRotation(from, to);
+		//oc.setRotation(from, to);
+		oc.setRotation(osg_rot);
 		oc.setTranslation(osg_trans);
 		oc.setScale(osg_scale);
+		//oc.useWorldFrame(true);
 
 		// tt
 		osg::ref_ptr<osg::Node> root = osgDB::readNodeFile(model_file);
 		if (!root.valid()) break;
-		root = oc.convert( root.get() );
+
+		TestVistor tester(rot, trans, scale);
+		root->accept(tester);
+
+		//root = oc.convert( root.get() );
 
 		if (!osgDB::writeNodeFile(*root,out_dir + "\\transform.osgb"))
 			std::cout<<out_dir<<" write failed.."<<std::endl;
@@ -890,7 +982,7 @@ error0:
 inline void EnableMemLeakCheck(void)
 {
 	_CrtSetDbgFlag(_CrtSetDbgFlag(_CRTDBG_REPORT_FLAG) | _CRTDBG_LEAK_CHECK_DF);
-	//_CrtSetBreakAlloc(2586);
+	//_CrtSetBreakAlloc(6330);
 }
 
 void main(int argc, char **argv)

@@ -1,2 +1,2 @@
-D:\struct_lib_code\GitHub\osg_lod_test\osg_lod_test\data\in\lod\test\mesh_adj_model.osgb
-E:\data\pingxiang\px8\combination_data\test\mesh_adj_model.obj.transformation
+E:\Misc\data\pingxiang\px8\lod_test\2\mesh_adj_model.osgb
+E:\Misc\data\pingxiang\px8\lod_test\2\mesh_adj_model.obj.transformation
