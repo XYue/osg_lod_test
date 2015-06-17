@@ -1,2 +1,2 @@
-E:\Misc\data\pingxiang\px8\lod_test\2\mesh_adj_model.osgb
-E:\Misc\data\pingxiang\px8\lod_test\2\mesh_adj_model.obj.transformation
+E:\data\exe_test\lod_test\haian_crop_6_c\lod_model.osgb
+E:\data\pingxiang\px8\combination_data\2\mesh_adj_model.obj.transformation

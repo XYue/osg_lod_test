@@ -59,6 +59,11 @@ public:
 						osg::Vec3 * v = &ver_array->operator [](i);
 						//std::cout<<v->_v[0]<<" "<<v->_v[1]<<" "<<v->_v[2]<<std::endl;
 
+						
+						v->_v[1] *= -1;
+						std::swap(v->_v[1], v->_v[2]);
+						//std::cout<<v->_v[0]<<" "<<v->_v[1]<<" "<<v->_v[2]<<std::endl;
+
 // 						if (file.good())
 // 						{
 // 							file << v->_v[0]<<" "<<v->_v[1]<<" "<<v->_v[2]<<std::endl;
@@ -69,6 +74,10 @@ public:
 						v->_v[0] = ver(0);
 						v->_v[1] = ver(1);
 						v->_v[2] = ver(2);
+						
+						// back
+						std::swap(v->_v[1], v->_v[2]);
+						v->_v[1] *= -1;
 					}
 				}     
 
@@ -82,11 +91,19 @@ public:
 					for ( unsigned int i = 0; i < n_array->size(); i++ ) {
 
 						osg::Vec3 * v = &n_array->operator [](i);
+
+						v->_v[1] *= -1;
+						std::swap(v->_v[1], v->_v[2]);						
+
 						Eigen::Vector3d ver(v->_v[0],v->_v[1],v->_v[2]);
 						ver =  _rot * ver ;
 						v->_v[0] = ver(0);
 						v->_v[1] = ver(1);
 						v->_v[2] = ver(2);
+
+						// back
+						std::swap(v->_v[1], v->_v[2]);
+						v->_v[1] *= -1;
 					}
 				}  
 			}
@@ -136,7 +153,91 @@ public:
 		{
 			std::cout<<"  files = '"<<plod.getFileName(i)<<"'"<<std::endl;
 		}
-	}    
+		
+		for(unsigned int i = 0; i < plod.getNumChildren(); ++i)
+		{
+			osg::Node * node = plod.getChild(i);
+			std::cout<<"node"<<std::endl;
+
+			osg::Group * group = node->asGroup();
+			if (group)
+			{
+				std::cout<<"group"<<std::endl;
+				for(unsigned int i_g = 0; i_g < group->getNumChildren(); ++i_g)
+				{
+					osg::Node * node_1 = group->getChild(i_g);
+
+					osg::Group * group1 = node_1->asGroup();
+					if (group1)
+					{
+						std::cout<<"group1"<<std::endl;
+					}
+
+					osg::Geode * geode1 = node_1->asGeode();
+					if (geode1)
+					{
+						std::cout<<"geode1"<<std::endl;
+						unsigned int    vertNum = 0;
+						unsigned int numGeoms = geode1->getNumDrawables();
+
+						for( unsigned int geodeIdx = 0; geodeIdx < numGeoms; geodeIdx++ ) 
+						{
+							osg::Geometry *curGeom = geode1->getDrawable( geodeIdx )->asGeometry();
+
+							if ( curGeom )
+							{
+								osg::Vec3Array * ver_array = dynamic_cast< osg::Vec3Array *>(curGeom->getVertexArray());
+								std::cout<<"ver_array "<<ver_array->size()<<std::endl;
+							}
+						}
+					}
+				}
+			}
+			
+			osg::Geode * geode = node->asGeode();
+			if (geode)
+			{
+				std::cout<<"geode"<<std::endl;
+
+				unsigned int    vertNum = 0;
+				unsigned int numGeoms = geode->getNumDrawables();
+
+				for( unsigned int geodeIdx = 0; geodeIdx < numGeoms; geodeIdx++ ) 
+				{
+					osg::Geometry *curGeom = geode->getDrawable( geodeIdx )->asGeometry();
+
+					if ( curGeom )
+					{
+						osg::Vec3Array * ver_array = dynamic_cast< osg::Vec3Array *>(curGeom->getVertexArray());
+						std::cout<<"ver_array "<<ver_array->size()<<std::endl;
+					}
+				}
+			}		
+		}
+	} 
+
+	virtual void apply(osg::Node &node)
+	{
+		osg::Geode * geode = node.asGeode();
+		std::cout<<"node"<<std::endl;
+
+		if (geode)
+		{
+			unsigned int    vertNum = 0;
+			unsigned int numGeoms = geode->getNumDrawables();
+
+			for( unsigned int geodeIdx = 0; geodeIdx < numGeoms; geodeIdx++ ) 
+			{
+				osg::Geometry *curGeom = geode->getDrawable( geodeIdx )->asGeometry();
+
+				if ( curGeom )
+				{
+					osg::Vec3Array * ver_array = dynamic_cast< osg::Vec3Array *>(curGeom->getVertexArray());
+					std::cout<<"ver_array "<<ver_array->size()<<std::endl;
+				}
+			}
+		}		
+	}
 };
 
 
@@ -964,8 +1065,11 @@ int transformation_main_proxy_test(int argc, char **argv)
 		osg::ref_ptr<osg::Node> root = osgDB::readNodeFile(model_file);
 		if (!root.valid()) break;
 
-		TestVistor tester(rot, trans, scale);
-		root->accept(tester);
+// 		TestVistor tester(rot, trans, scale);
+// 		root->accept(tester);
+
+		CheckVisitor check;
+		root->accept(check);
 
 		//root = oc.convert( root.get() );
 
