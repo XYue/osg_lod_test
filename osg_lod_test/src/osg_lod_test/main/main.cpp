@@ -216,13 +216,20 @@ public:
 		}
 	} 
 
+	virtual void apply(osg::Group & group)
+	{
+
+	}
+
 	virtual void apply(osg::Node &node)
 	{
-		osg::Geode * geode = node.asGeode();
-		std::cout<<"node"<<std::endl;
 
+		std::cout<<"apply node"<<std::endl;
+
+		osg::Geode * geode = node.asGeode();
 		if (geode)
 		{
+			std::cout<<"geode"<<std::endl;
 			unsigned int    vertNum = 0;
 			unsigned int numGeoms = geode->getNumDrawables();
 
@@ -236,8 +243,44 @@ public:
 					std::cout<<"ver_array "<<ver_array->size()<<std::endl;
 				}
 			}
-		}		
+		}
+
+		osg::Group * group = node.asGroup();
+		if (group)
+		{
+			std::cout<<"group"<<std::endl;
+			for(unsigned int i_g = 0; i_g < group->getNumChildren(); ++i_g)
+			{
+				osg::Node * node_1 = group->getChild(i_g);
+
+				osg::Group * group1 = node_1->asGroup();
+				if (group1)
+				{
+					std::cout<<"group1"<<std::endl;
+				}
+
+				osg::Geode * geode1 = node_1->asGeode();
+				if (geode1)
+				{
+					std::cout<<"geode1"<<std::endl;
+					unsigned int    vertNum = 0;
+					unsigned int numGeoms = geode1->getNumDrawables();
+
+					for( unsigned int geodeIdx = 0; geodeIdx < numGeoms; geodeIdx++ ) 
+					{
+						osg::Geometry *curGeom = geode1->getDrawable( geodeIdx )->asGeometry();
+
+						if ( curGeom )
+						{
+							osg::Vec3Array * ver_array = dynamic_cast< osg::Vec3Array *>(curGeom->getVertexArray());
+							std::cout<<"ver_array "<<ver_array->size()<<std::endl;
+						}
+					}
+				}
+			}
+		}
 	}
+	
 };
 
 
