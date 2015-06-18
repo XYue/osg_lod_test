@@ -26,6 +26,70 @@
 
 #include "OrientationConverter.h"
 
+class TraverseVisitor : public osg::NodeVisitor
+{
+public:
+	TraverseVisitor():
+		osg::NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN)
+	{
+	}
+
+	virtual void apply(osg::Node & node)
+	{
+		std::cout<<"node"<<std::endl;
+
+		traverse(node);
+	}   
+
+	virtual void apply(osg::Group & group)
+	{
+		std::cout<<"group"<<std::endl;
+
+		traverse(group);
+	} 
+
+	virtual void apply(osg::Geode & geode)
+	{
+		std::cout<<"geode"<<std::endl;
+
+		unsigned int    vertNum = 0;
+		unsigned int numGeoms = geode.getNumDrawables();
+		for( unsigned int geodeIdx = 0; geodeIdx < numGeoms; geodeIdx++ ) 
+		{
+			osg::Geometry *curGeom = geode.getDrawable( geodeIdx )->asGeometry();
+			if ( curGeom )
+			{
+				osg::Vec3Array * ver_array = dynamic_cast< osg::Vec3Array *>(curGeom->getVertexArray());
+				if ( ver_array ) 
+				{
+					std::cout<<"ver_array: "<<ver_array->size()<<std::endl;
+				}
+			}
+		}
+
+
+		traverse(geode);
+	} 
+
+	virtual void apply(osg::PagedLOD & lod)
+	{
+		std::cout<<"lod"<<std::endl;
+		std::cout<<"PagedLOD "<<lod.getName()<<"  numRanges = "<< lod.getNumRanges()<<"  numFiles = "<<lod.getNumFileNames()<<std::endl;
+		for(unsigned int i=0;i<lod.getNumFileNames();++i)
+		{
+			std::cout<<"  files = '"<<lod.getFileName(i)<<"'"<<std::endl;
+			if (!lod.getFileName(i).empty())
+			{
+				_ref_filenames.push_back(lod.getFileName(i));
+			}
+		}
+
+		traverse(lod);
+	}
+
+	std::vector<std::string> _ref_filenames;
+};
+
 class TestVistor : public osg::NodeVisitor
 {
 public:
@@ -1111,8 +1175,17 @@ int transformation_main_proxy_test(int argc, char **argv)
 // 		TestVistor tester(rot, trans, scale);
 // 		root->accept(tester);
 
-		CheckVisitor check;
-		root->accept(check);
+// 		CheckVisitor check;
+// 		root->accept(check);
+
+		TraverseVisitor visitor;
+		root->accept(visitor);
+
+		std::cout<<"ref_filenames:"<<std::endl;
+		for (int i = 0; i < visitor._ref_filenames.size(); ++i)
+		{
+			std::cout<<visitor._ref_filenames[i]<<std::endl;
+		}
 
 		//root = oc.convert( root.get() );
 
